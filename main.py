@@ -3,31 +3,59 @@ import os
 from langchain_openai import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from templates import *  # Ensure templates.py exists
+from templates import *
 from io import BytesIO
 from fpdf import FPDF
 
-# ✅ FIXED: Ensure API Key is imported correctly
-try:
-    OPENAI_API_KEY = st.secrets["key"]
-    st.write("✅ API key successfully loaded!")
-except KeyError:
-    st.error("❌ ERROR: `OPENAI_API_KEY` not found in Streamlit secrets.")
-    OPENAI_API_KEY = None  # Ensure it doesn't cause a NameError later
+# More flexible API key handling
+def get_api_key():
+    # Try to get API key from Streamlit secrets
+    try:
+        return st.secrets["OPENAI_API_KEY"]
+    except KeyError:
+        pass
+    
+    # Try to get API key from environment variable
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key:
+        return api_key
+    
+    # If no API key found, show input field
+    if 'OPENAI_API_KEY' not in st.session_state:
+        st.session_state.OPENAI_API_KEY = ''
+    
+    api_key = st.sidebar.text_input("Enter your OpenAI API key:", 
+                                   value=st.session_state.OPENAI_API_KEY,
+                                   type="password")
+    if api_key:
+        st.session_state.OPENAI_API_KEY = api_key
+        return api_key
+    return None
 
-# ✅ FIXED: Correct `OpenAI` initialization\
-if OPENAI_API_KEY:
-    llm = OpenAI(openai_api_key=OPENAI_API_KEY, temperature=0.75)
-else:
-    st.error("❌ OpenAI API key is missing. Check your `.streamlit/secrets.toml` or Streamlit Cloud secrets.")
+# Initialize OpenAI with API key handling
+def initialize_llm():
+    api_key = get_api_key()
+    if api_key:
+        try:
+            llm = OpenAI(openai_api_key=api_key, temperature=0.75)
+            return llm
+        except Exception as e:
+            st.error(f"Error initializing OpenAI: {str(e)}")
+            return None
+    return None
 
 # Function to generate content
 def generate_content(template, sector, topic):
+    llm = initialize_llm()
+    if llm is None:
+        st.error("Please provide a valid OpenAI API key to generate content.")
+        return None
+    
     prompt = PromptTemplate(input_variables=["sector", "topic"], template=template)
     chain = LLMChain(llm=llm, prompt=prompt)
     return chain.run(sector=sector, topic=topic)
 
-# Function to convert text to a PDF and return as a BytesIO object
+# Function to convert text to a PDF
 def convert_to_pdf(content):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=10)
@@ -35,9 +63,8 @@ def convert_to_pdf(content):
     pdf.set_font("Arial", size=12)
     pdf.multi_cell(0, 10, content)
 
-    # Save PDF to memory instead of file system
     pdf_buffer = BytesIO()
-    pdf.output(pdf_buffer, dest='S').encode('latin1')  # Corrected encoding issue
+    pdf.output(pdf_buffer, dest='S').encode('latin1')
     pdf_buffer.seek(0)
     
     return pdf_buffer
@@ -76,27 +103,31 @@ def main():
                 template = template_map[content_type]
                 generated_content = generate_content(template, sector, topic)
 
-                # Store generated content in session state
-                st.session_state.generated_content = generated_content
+                if generated_content:
+                    # Store generated content in session state
+                    st.session_state.generated_content = generated_content
 
-                # Display generated content
-                st.subheader("Generated Content:")
-                st.markdown(generated_content)
+                    # Display generated content
+                    st.subheader("Generated Content:")
+                    st.markdown(generated_content)
 
-                # Convert content to PDF for download
-                pdf_buffer = convert_to_pdf(generated_content)
-                st.download_button(
-                    label="Download as PDF",
-                    data=pdf_buffer,
-                    file_name=f"{content_type.lower().replace(' ', '_')}.pdf",
-                    mime="application/pdf"
-                )
+                    # Convert content to PDF for download
+                    pdf_buffer = convert_to_pdf(generated_content)
+                    st.download_button(
+                        label="Download as PDF",
+                        data=pdf_buffer,
+                        file_name=f"{content_type.lower().replace(' ', '_')}.pdf",
+                        mime="application/pdf"
+                    )
         else:
             st.error("❌ Please enter both sector and topic!")
 
     # Reset Button
     if st.button("Reset Fields"):
+        # Keep API key when resetting
+        api_key = st.session_state.get('OPENAI_API_KEY', '')
         st.session_state.clear()
+        st.session_state.OPENAI_API_KEY = api_key
         st.experimental_rerun()
 
 if __name__ == "__main__":
