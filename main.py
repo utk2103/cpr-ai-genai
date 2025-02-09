@@ -9,7 +9,7 @@ from fpdf import FPDF
 
 # ✅ FIXED: Ensure API Key is imported correctly
 try:
-    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    OPENAI_API_KEY = st.secrets["key"]
     st.write("✅ API key successfully loaded!")
 except KeyError:
     st.error("❌ ERROR: `OPENAI_API_KEY` not found in Streamlit secrets.")
@@ -17,11 +17,7 @@ except KeyError:
 
 # ✅ FIXED: Correct `OpenAI` initialization\
 if OPENAI_API_KEY:
-    llm = OpenAI(
-        model="gpt-3.5-turbo",
-        api_key=OPENAI_API_KEY,
-        temperature=0.75
-    )
+    llm = OpenAI(openai_api_key=OPENAI_API_KEY, temperature=0.75)
 else:
     st.error("❌ OpenAI API key is missing. Check your `.streamlit/secrets.toml` or Streamlit Cloud secrets.")
 
