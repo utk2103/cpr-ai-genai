@@ -1,6 +1,7 @@
 import streamlit as st
 import os
-from langchain_openai import OpenAI
+from openai import OpenAI as OpenAIClient
+from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from templates import *
@@ -32,12 +33,10 @@ def initialize_llm():
             return None
         
         # Initialize OpenAI with the retrieved key
-        llm = OpenAI(
+        llm = ChatOpenAI(
             openai_api_key=api_key, 
             temperature=0.75,
-            # Add additional parameters for more robust initialization
-            max_tokens=1000,
-            model="gpt-3.5-turbo-instruct"  # Specify the model explicitly
+            model="gpt-3.5-turbo"
         )
         return llm
     
@@ -157,3 +156,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
