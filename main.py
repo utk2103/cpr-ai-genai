@@ -7,55 +7,75 @@ from templates import *
 from io import BytesIO
 from fpdf import FPDF
 
-# More flexible API key handling
+# Robust API key handling
 def get_api_key():
-    # # Try to get API key from Streamlit secrets
-    # try:
-    #     return st.secrets["key"]
-    # except KeyError:
-    #     pass
-    
-    # # Try to get API key from environment variable
-    # api_key = os.getenv("OPENAI_API_KEY")
-    # if api_key:
-    #     return api_key
-    
-    # # If no API key found, show input field
-    # if 'OPENAI_API_KEY' not in st.session_state:
-    #     st.session_state.OPENAI_API_KEY = ''
-    
-    # api_key = st.sidebar.text_input("Enter your OpenAI API key:", 
-    #                                value=st.session_state.OPENAI_API_KEY,
-    #                                type="password")
-    # if api_key:
-    #     st.session_state.OPENAI_API_KEY = api_key
-    #     return api_key
-    # return None
-    
-    default_api_key = st.secrets["key"]
-    return default_api_key
-# Initialize OpenAI with API key handling
-def initialize_llm():
-    api_key = get_api_key()
-    if api_key:
-        try:
-            llm = OpenAI(openai_api_key=default_api_key, temperature=0.75)
-            return llm
-        except Exception as e:
-            st.error(f"Error initializing OpenAI: {str(e)}")
+    try:
+        # Attempt to retrieve the API key from Streamlit secrets
+        api_key = st.secrets["key"]
+        if not api_key:
+            st.error("API key is empty. Please check your Streamlit secrets configuration.")
             return None
-    return None
+        return api_key
+    except KeyError:
+        st.error("API key not found in Streamlit secrets. Please configure the key.")
+        return None
+
+# Initialize OpenAI with error handling
+def initialize_llm():
+    try:
+        # Retrieve the API key
+        api_key = get_api_key()
+        
+        # Check if API key is valid
+        if not api_key:
+            st.error("Unable to retrieve a valid API key.")
+            return None
+        
+        # Initialize OpenAI with the retrieved key
+        llm = OpenAI(
+            openai_api_key=api_key, 
+            temperature=0.75,
+            # Add additional parameters for more robust initialization
+            max_tokens=1000,
+            model="gpt-3.5-turbo-instruct"  # Specify the model explicitly
+        )
+        return llm
+    
+    except Exception as e:
+        st.error(f"Error initializing OpenAI: {str(e)}")
+        return None
 
 # Function to generate content
 def generate_content(template, sector, topic):
+    # Initialize LLM with comprehensive error checking
     llm = initialize_llm()
+    
+    # Validate LLM initialization
     if llm is None:
-        st.error("Please provide a valid OpenAI API key to generate content.")
+        st.error("Failed to initialize OpenAI. Please check your API key and try again.")
         return None
     
-    prompt = PromptTemplate(input_variables=["sector", "topic"], template=template)
-    chain = LLMChain(llm=llm, prompt=prompt)
-    return chain.run(sector=sector, topic=topic)
+    try:
+        # Create and run the prompt chain
+        prompt = PromptTemplate(
+            input_variables=["sector", "topic"], 
+            template=template
+        )
+        chain = LLMChain(llm=llm, prompt=prompt)
+        
+        # Generate content with error handling
+        generated_content = chain.run(sector=sector, topic=topic)
+        
+        # Additional validation of generated content
+        if not generated_content or generated_content.strip() == "":
+            st.error("Content generation failed. The response was empty.")
+            return None
+        
+        return generated_content
+    
+    except Exception as e:
+        st.error(f"Error during content generation: {str(e)}")
+        return None
 
 # Function to convert text to a PDF
 def convert_to_pdf(content):
@@ -92,44 +112,47 @@ def main():
 
     # Generate content button
     if st.button("Generate Content"):
-        if sector and topic:
-            with st.spinner("Generating content..."):
-                template_map = {
-                    "Press Release": PRESS_RELEASE_TEMPLATE,
-                    "Guest Column": GUEST_COLUMN_TEMPLATE,
-                    "Leadership Article": LEADERSHIP_ARTICLE_TEMPLATE,
-                    "Blog Post": BLOG_POST_TEMPLATE,
-                    "Social Media": SOCIAL_MEDIA_TEMPLATE
-                }
-                
-                template = template_map[content_type]
-                generated_content = generate_content(template, sector, topic)
-
-                if generated_content:
-                    # Store generated content in session state
-                    st.session_state.generated_content = generated_content
-
-                    # Display generated content
-                    st.subheader("Generated Content:")
-                    st.markdown(generated_content)
-
-                    # Convert content to PDF for download
-                    pdf_buffer = convert_to_pdf(generated_content)
-                    st.download_button(
-                        label="Download as PDF",
-                        data=pdf_buffer,
-                        file_name=f"{content_type.lower().replace(' ', '_')}.pdf",
-                        mime="application/pdf"
-                    )
-        else:
+        # Validate inputs
+        if not sector or not topic:
             st.error("❌ Please enter both sector and topic!")
+            return
+
+        # Attempt content generation
+        with st.spinner("Generating content..."):
+            template_map = {
+                "Press Release": PRESS_RELEASE_TEMPLATE,
+                "Guest Column": GUEST_COLUMN_TEMPLATE,
+                "Leadership Article": LEADERSHIP_ARTICLE_TEMPLATE,
+                "Blog Post": BLOG_POST_TEMPLATE,
+                "Social Media": SOCIAL_MEDIA_TEMPLATE
+            }
+            
+            template = template_map[content_type]
+            generated_content = generate_content(template, sector, topic)
+
+            # Handle generated content
+            if generated_content:
+                # Store generated content in session state
+                st.session_state.generated_content = generated_content
+
+                # Display generated content
+                st.subheader("Generated Content:")
+                st.markdown(generated_content)
+
+                # Convert content to PDF for download
+                pdf_buffer = convert_to_pdf(generated_content)
+                st.download_button(
+                    label="Download as PDF",
+                    data=pdf_buffer,
+                    file_name=f"{content_type.lower().replace(' ', '_')}.pdf",
+                    mime="application/pdf"
+                )
+            else:
+                st.error("Content generation failed. Please check your inputs and API key.")
 
     # Reset Button
     if st.button("Reset Fields"):
-        # Keep API key when resetting
-        api_key = st.session_state.get('OPENAI_API_KEY', '')
         st.session_state.clear()
-        st.session_state.OPENAI_API_KEY = api_key
         st.experimental_rerun()
 
 if __name__ == "__main__":
