@@ -9,35 +9,37 @@ from fpdf import FPDF
 
 # More flexible API key handling
 def get_api_key():
-    # Try to get API key from Streamlit secrets
-    try:
-        return st.secrets["key"]
-    except KeyError:
-        pass
+    # # Try to get API key from Streamlit secrets
+    # try:
+    #     return st.secrets["key"]
+    # except KeyError:
+    #     pass
     
-    # Try to get API key from environment variable
-    api_key = os.getenv("OPENAI_API_KEY")
-    if api_key:
-        return api_key
+    # # Try to get API key from environment variable
+    # api_key = os.getenv("OPENAI_API_KEY")
+    # if api_key:
+    #     return api_key
     
-    # If no API key found, show input field
-    if 'OPENAI_API_KEY' not in st.session_state:
-        st.session_state.OPENAI_API_KEY = ''
+    # # If no API key found, show input field
+    # if 'OPENAI_API_KEY' not in st.session_state:
+    #     st.session_state.OPENAI_API_KEY = ''
     
-    api_key = st.sidebar.text_input("Enter your OpenAI API key:", 
-                                   value=st.session_state.OPENAI_API_KEY,
-                                   type="password")
-    if api_key:
-        st.session_state.OPENAI_API_KEY = api_key
-        return api_key
-    return None
-
+    # api_key = st.sidebar.text_input("Enter your OpenAI API key:", 
+    #                                value=st.session_state.OPENAI_API_KEY,
+    #                                type="password")
+    # if api_key:
+    #     st.session_state.OPENAI_API_KEY = api_key
+    #     return api_key
+    # return None
+    
+    default_api_key = st.secrets["default_api_key"]
+    return default_api_key
 # Initialize OpenAI with API key handling
 def initialize_llm():
     api_key = get_api_key()
     if api_key:
         try:
-            llm = OpenAI(openai_api_key=api_key, temperature=0.75)
+            llm = OpenAI(openai_api_key=default_api_key, temperature=0.75)
             return llm
         except Exception as e:
             st.error(f"Error initializing OpenAI: {str(e)}")
