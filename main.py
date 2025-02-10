@@ -11,7 +11,7 @@ from fpdf import FPDF
 def get_api_key():
     # Try to get API key from Streamlit secrets
     try:
-        return st.secrets["OPENAI_API_KEY"]
+        return st.secrets["key"]
     except KeyError:
         pass
     
