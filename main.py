@@ -32,7 +32,7 @@ def get_api_key():
     #     return api_key
     # return None
     
-    default_api_key = st.secrets["default_api_key"]
+    default_api_key = st.secrets["key"]
     return default_api_key
 # Initialize OpenAI with API key handling
 def initialize_llm():
